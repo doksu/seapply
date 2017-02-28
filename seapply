@@ -120,7 +120,7 @@ def main():
             except IndexError:
 
                 # print to stdout
-                print(getRunningConfig())
+                print(json.dumps(getRunningConfig()))
 
         else:
 
