@@ -61,6 +61,10 @@ def checkConfig(fileconfig):
             if error == True:
                 sys.exit(1)
 
+def usage():
+    print("\nUsage: seapply {export|dryrun|apply} [filename]\n\
+seapply applies differential SELinux configuation changes to a host\n")
+
 def main():
 
     try:
@@ -157,10 +161,10 @@ def main():
 
         else:
 
-            print "usage: ..."
+            usage()
 
     except IndexError:
 
-        print "usage"
+        usage()
 
 main()
