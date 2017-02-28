@@ -1,0 +1,133 @@
+#! /usr/bin/python -Es
+# Copyright (C) 2017 Red Hat
+# AUTHOR: Douglas Graeme Brown <dgbrown@redhat.com>
+# see file 'COPYING' for use and warranty information
+#
+# seapply is a tool for applying differential changes to SELinux
+#
+#    This program is free software; you can redistribute it and/or
+#    modify it under the terms of the GNU General Public License as
+#    published by the Free Software Foundation; either version 2 of
+#    the License, or (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+#                                        02111-1307  USA
+#
+#
+
+import sys
+import seobject
+import json
+
+PROGNAME = "policycoreutils"
+SUPPORTED = ('seluserRecords', 'loginRecords')
+
+def readConfig(filepath):
+    with open(filepath, 'r') as fileobject:
+        filecontent = fileobject.read()
+    try:
+        fileconfig = json.loads(filecontent)
+    except:
+        print("Invalid JSON")
+        sys.exit(3)
+    return fileconfig
+
+def covertDictTuplesToList(thedictionary):
+    for thetuple in thedictionary:
+        thedictionary[thetuple] = list(thedictionary[thetuple])
+    return thedictionary
+
+def getRunningConfig():
+    theobject = seobject.seluserRecords()
+    usermaps = theobject.get_all()
+    theobject = seobject.loginRecords()
+    loginmaps = theobject.get_all()
+    return {'seluserRecords': covertDictTuplesToList(usermaps), 'loginRecords': covertDictTuplesToList(loginmaps)}
+
+def checkConfig(fileconfig):
+    error = False
+    for key in fileconfig:
+        if key not in SUPPORTED:
+            error = True
+            print("Unsupported " + key + " found!")
+
+            if error == True:
+                sys.exit(1)
+
+def main():
+
+    try:
+
+        if sys.argv[1] == 'apply' or sys.argv[1] == 'dryrun':
+
+            fileconfig = readConfig(sys.argv[2])
+            checkConfig(fileconfig)
+            runningconfig = getRunningConfig()
+
+            for setype in SUPPORTED:
+                if setype == 'seluserRecords':
+                    theobject = seobject.seluserRecords()
+                elif setype == 'loginRecords':
+                    theobject = seobject.loginRecords()
+                else:
+                    print("Unsupported setype: " + settype)
+
+                for key in set(list(runningconfig[setype].keys()) + list(fileconfig[setype].keys())):
+                    if key in runningconfig[setype].keys() and key in fileconfig[setype].keys():
+                        if runningconfig[setype][key] != fileconfig[setype][key]:
+                            print("change=\"modify\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(fileconfig[setype][key]) + "\"")
+                            if sys.argv[1] == 'apply':
+                                if setype == 'seluserRecords':
+                                    theobject.modify(str(key), roles=str(fileconfig[setype][key][3]).split(), selevel=str(fileconfig[setype][key][1]), serange=str(fileconfig[setype][key][2]), prefix=str(fileconfig[setype][key][0]))
+                                elif setype == 'loginRecords':
+                                    theobject.modify(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
+                    elif key in runningconfig[setype].keys() and key not in fileconfig[setype].keys():
+                        print("change=\"delete\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(runningconfig[setype][key]) + "\"")
+                        if sys.argv[1] == 'apply':
+                            theobject.delete(key)
+                    elif key not in runningconfig[setype].keys() and key in fileconfig[setype].keys():
+                        print("change=\"add\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(fileconfig[setype][key]) + "\"")
+                        if sys.argv[1] == 'apply':
+                            if setype == 'seluserRecords':
+                                theobject.add(str(key), roles=str(fileconfig[setype][key][3]).split(), selevel=str(fileconfig[setype][key][1]), serange=str(fileconfig[setype][key][2]), prefix=str(fileconfig[setype][key][0]))
+                            elif setype == 'loginRecords':
+                                theobject.add(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
+
+                    ############################### NEED TO PERFORM FINAL CHECK HERE TO DETERMINE IF CHANGES WERE SUCCESSFUL
+
+                    else:
+                        print("Something went wrong")
+                        sys.exit(2)
+
+        elif sys.argv[1] == 'export':
+
+            # if a path to an export file was provided
+            try:
+                if sys.argv[2]:
+
+                    content_file = open(sys.argv[2], 'w+')
+                    content_file.write(json.dumps(getRunningConfig()))
+                    content_file.close()
+
+            # if no path to an export file was provided
+            except IndexError:
+
+                # print to stdout
+                print(getRunningConfig())
+
+        else:
+
+            print "usage: ..."
+
+    except IndexError:
+
+        print "usage"
+
+main()
