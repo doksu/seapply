@@ -72,37 +72,70 @@ def main():
             runningconfig = getRunningConfig()
 
             for setype in SUPPORTED:
+
                 if setype == 'seluserRecords':
+
                     theobject = seobject.seluserRecords()
+
                 elif setype == 'loginRecords':
+
                     theobject = seobject.loginRecords()
+
                 else:
+
                     print("Unsupported setype: " + settype)
 
+                # compare configurations for the setype
                 for key in set(list(runningconfig[setype].keys()) + list(fileconfig[setype].keys())):
+
+                    # if the configuration is expected
                     if key in runningconfig[setype].keys() and key in fileconfig[setype].keys():
+                        
+                        # but the values of the configuration are different
                         if runningconfig[setype][key] != fileconfig[setype][key]:
+
                             print("change=\"modify\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(fileconfig[setype][key]) + "\"")
                             if sys.argv[1] == 'apply':
+
                                 if setype == 'seluserRecords':
+
+                                    # change the configuration so it matches
                                     theobject.modify(str(key), roles=str(fileconfig[setype][key][3]).split(), selevel=str(fileconfig[setype][key][1]), serange=str(fileconfig[setype][key][2]), prefix=str(fileconfig[setype][key][0]))
+
                                 elif setype == 'loginRecords':
+
                                     theobject.modify(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
+
+                    # if the configuration isn't expected
                     elif key in runningconfig[setype].keys() and key not in fileconfig[setype].keys():
+
                         print("change=\"delete\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(runningconfig[setype][key]) + "\"")
                         if sys.argv[1] == 'apply':
+
+                            # remove the configuration
                             theobject.delete(key)
+
+                    # if the configuration should exist but doesn't
                     elif key not in runningconfig[setype].keys() and key in fileconfig[setype].keys():
+
                         print("change=\"add\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(fileconfig[setype][key]) + "\"")
+
                         if sys.argv[1] == 'apply':
+
                             if setype == 'seluserRecords':
+
+                                # add seuser configuration
                                 theobject.add(str(key), roles=str(fileconfig[setype][key][3]).split(), selevel=str(fileconfig[setype][key][1]), serange=str(fileconfig[setype][key][2]), prefix=str(fileconfig[setype][key][0]))
+
                             elif setype == 'loginRecords':
+
+                                # add login configuration
                                 theobject.add(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
 
                     ############################### NEED TO PERFORM FINAL CHECK HERE TO DETERMINE IF CHANGES WERE SUCCESSFUL
 
                     else:
+
                         print("Something went wrong")
                         sys.exit(2)
 
