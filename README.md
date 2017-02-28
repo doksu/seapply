@@ -1,5 +1,4 @@
 # seapply
-seapply command for SELinux
 
 The seapply command is used to apply differential^ SELinux configuation changes to a host and is designed for use with configuration management tools such as Ansible or puppet.
 

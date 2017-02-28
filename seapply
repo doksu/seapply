@@ -136,8 +136,6 @@ def main():
                                 # add login configuration
                                 theobject.add(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
 
-                    ############################### NEED TO PERFORM FINAL CHECK HERE TO DETERMINE IF CHANGES WERE SUCCESSFUL
-
                     else:
 
                         print("Something went wrong")
