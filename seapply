@@ -29,15 +29,19 @@ import json
 PROGNAME = "policycoreutils"
 SUPPORTED = ('seluserRecords', 'loginRecords')
 
-def readConfig(filepath):
-    with open(filepath, 'r') as fileobject:
-        filecontent = fileobject.read()
+def parseConfig(jsoncontent):
     try:
-        fileconfig = json.loads(filecontent)
+        config = json.loads(jsoncontent)
     except:
         print("Invalid JSON")
         sys.exit(3)
-    return fileconfig
+    checkConfig(config)
+    return config
+
+def readFile(filepath):
+    with open(filepath, 'r') as fileobject:
+        filecontent = fileobject.read()
+    return filecontent
 
 def covertDictTuplesToList(thedictionary):
     for thetuple in thedictionary:
@@ -51,12 +55,12 @@ def getRunningConfig():
     loginmaps = theobject.get_all()
     return {'seluserRecords': covertDictTuplesToList(usermaps), 'loginRecords': covertDictTuplesToList(loginmaps)}
 
-def checkConfig(fileconfig):
+def checkConfig(config):
     error = False
-    for key in fileconfig:
+    for key in config:
         if key not in SUPPORTED:
             error = True
-            print("Unsupported " + key + " found!")
+            print("Unsupported setype " + key + " found!")
 
             if error == True:
                 sys.exit(1)
@@ -71,8 +75,19 @@ def main():
 
         if sys.argv[1] == 'apply' or sys.argv[1] == 'dryrun':
 
-            fileconfig = readConfig(sys.argv[2])
-            checkConfig(fileconfig)
+            stdin = str()
+
+            # if there's something in stdin
+            if not sys.stdin.isatty():
+                for line in sys.stdin:
+                    stdin += line
+                providedconfig = parseConfig(stdin)
+
+            # otherwise read from file
+            else:
+                filecontent = readFile(sys.argv[2])
+                providedconfig = parseConfig(filecontent)
+
             runningconfig = getRunningConfig()
 
             for setype in SUPPORTED:
@@ -85,33 +100,29 @@ def main():
 
                     theobject = seobject.loginRecords()
 
-                else:
-
-                    print("Unsupported setype: " + settype)
-
                 # compare configurations for the setype
-                for key in set(list(runningconfig[setype].keys()) + list(fileconfig[setype].keys())):
+                for key in set(list(runningconfig[setype].keys()) + list(providedconfig[setype].keys())):
 
                     # if the configuration is expected
-                    if key in runningconfig[setype].keys() and key in fileconfig[setype].keys():
+                    if key in runningconfig[setype].keys() and key in providedconfig[setype].keys():
                         
                         # but the values of the configuration are different
-                        if runningconfig[setype][key] != fileconfig[setype][key]:
+                        if runningconfig[setype][key] != providedconfig[setype][key]:
 
-                            print("change=\"modify\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(fileconfig[setype][key]) + "\"")
+                            print("change=\"modify\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(providedconfig[setype][key]) + "\"")
                             if sys.argv[1] == 'apply':
 
                                 if setype == 'seluserRecords':
 
                                     # change the configuration so it matches
-                                    theobject.modify(str(key), roles=str(fileconfig[setype][key][3]).split(), selevel=str(fileconfig[setype][key][1]), serange=str(fileconfig[setype][key][2]), prefix=str(fileconfig[setype][key][0]))
+                                    theobject.modify(str(key), roles=str(providedconfig[setype][key][3]).split(), selevel=str(providedconfig[setype][key][1]), serange=str(providedconfig[setype][key][2]), prefix=str(providedconfig[setype][key][0]))
 
                                 elif setype == 'loginRecords':
 
-                                    theobject.modify(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
+                                    theobject.modify(str(key), sename=str(providedconfig[setype][key][0]), serange=str(providedconfig[setype][key][1]))
 
                     # if the configuration isn't expected
-                    elif key in runningconfig[setype].keys() and key not in fileconfig[setype].keys():
+                    elif key in runningconfig[setype].keys() and key not in providedconfig[setype].keys():
 
                         print("change=\"delete\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(runningconfig[setype][key]) + "\"")
                         if sys.argv[1] == 'apply':
@@ -120,21 +131,21 @@ def main():
                             theobject.delete(key)
 
                     # if the configuration should exist but doesn't
-                    elif key not in runningconfig[setype].keys() and key in fileconfig[setype].keys():
+                    elif key not in runningconfig[setype].keys() and key in providedconfig[setype].keys():
 
-                        print("change=\"add\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(fileconfig[setype][key]) + "\"")
+                        print("change=\"add\" setype=\"" + setype + "\" name=\"" + key + "\" value=\"" + str(providedconfig[setype][key]) + "\"")
 
                         if sys.argv[1] == 'apply':
 
                             if setype == 'seluserRecords':
 
                                 # add seuser configuration
-                                theobject.add(str(key), roles=str(fileconfig[setype][key][3]).split(), selevel=str(fileconfig[setype][key][1]), serange=str(fileconfig[setype][key][2]), prefix=str(fileconfig[setype][key][0]))
+                                theobject.add(str(key), roles=str(providedconfig[setype][key][3]).split(), selevel=str(providedconfig[setype][key][1]), serange=str(providedconfig[setype][key][2]), prefix=str(providedconfig[setype][key][0]))
 
                             elif setype == 'loginRecords':
 
                                 # add login configuration
-                                theobject.add(str(key), sename=str(fileconfig[setype][key][0]), serange=str(fileconfig[setype][key][1]))
+                                theobject.add(str(key), sename=str(providedconfig[setype][key][0]), serange=str(providedconfig[setype][key][1]))
 
                     else:
 
@@ -148,7 +159,7 @@ def main():
                 if sys.argv[2]:
 
                     content_file = open(sys.argv[2], 'w+')
-                    content_file.write(json.dumps(getRunningConfig()))
+                    content_file.write(json.dumps(getRunningConfig()) + '\n')
                     content_file.close()
 
             # if no path to an export file was provided
